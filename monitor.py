@@ -143,60 +143,22 @@ def search(cfg: dict[str, Any], departure: date, return_date: date) -> list[dict
 def store_and_alert(cfg: dict[str, Any], offers: list[dict[str, Any]], startup: bool = False) -> None:
     if not offers:
         LOG.info("Nenhuma oferta recebida nesta rodada.")
-        if startup:
-            telegram(cfg, "🔎 Busca inicial de passagem\n"
-                     f"{','.join(cfg['origins'])} → {cfg['destination']} | ida {cfg['departure']} e volta {cfg['return']}\n"
-                     "Não encontrei ofertas nessa consulta. Vou tentar novamente no próximo intervalo.")
+        telegram(cfg, "🔎 Nenhuma passagem encontrada nesta busca.")
         return
-    cheapest: dict[tuple[str, str, str], dict[str, Any]] = {}
-    for offer in offers:
-        key = (offer["origin"], offer["departure"], offer["return"])
-        if key not in cheapest or offer["amount"] < cheapest[key]["amount"]:
-            cheapest[key] = offer
-    offers = list(cheapest.values())
+    best = min(offers, key=lambda x: x["amount"])
     checked_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with sqlite3.connect(DB_PATH) as db:
-        for offer in offers:
-            key = (offer["origin"], cfg["destination"], offer["departure"], offer["return"])
-            previous_low, previous = db.execute(
-                "SELECT MIN(amount), (SELECT amount FROM fares WHERE origin=? AND destination=? AND departure=? AND return_date=? ORDER BY id DESC LIMIT 1) FROM fares WHERE origin=? AND destination=? AND departure=? AND return_date=?",
-                (*key, *key),
-            ).fetchone()
-            offer["previous_low"], offer["previous"] = previous_low, previous
-            db.execute(
-                "INSERT INTO fares (checked_at,origin,destination,departure,return_date,amount,currency,airline,outbound,inbound,stops_out,stops_in,offer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (checked_at, offer["origin"], cfg["destination"], offer["departure"], offer["return"], offer["amount"], offer["currency"], offer["airline"], offer["outbound"], offer["inbound"], offer["stops_out"], offer["stops_in"], offer["offer_id"]),
-            )
+        (previous_low,) = db.execute("SELECT MIN(amount) FROM fares").fetchone()
+        db.execute(
+            "INSERT INTO fares (checked_at,origin,destination,departure,return_date,amount,currency,airline,outbound,inbound,stops_out,stops_in,offer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (checked_at, best["origin"], cfg["destination"], best["departure"], best["return"], best["amount"], best["currency"], best["airline"], best["outbound"], best["inbound"], best["stops_out"], best["stops_in"], best["offer_id"]),
+        )
         db.commit()
-
-    best = min(offers, key=lambda x: x["amount"])
-    LOG.info("Rodada concluída: %s combinações; menor preço R$ %.2f (%s/%s).", len(offers), best["amount"], best["departure"], best["return"])
-    signals = []
-    for offer in offers:
-        reasons = []
-        if offer["amount"] <= cfg["max_price"] and (offer["previous"] is None or offer["previous"] > cfg["max_price"]):
-            reasons.append(f"atingiu o limite de R$ {cfg['max_price']:.2f}")
-        if offer["previous"] is not None and offer["amount"] < offer["previous"] - 0.009:
-            reasons.append(f"caiu R$ {offer['previous'] - offer['amount']:.2f} desde a última consulta")
-        if offer["previous_low"] is None or offer["amount"] < offer["previous_low"] - 0.009:
-            reasons.append("novo menor preço registrado nestas datas")
-        if reasons:
-            signals.append((offer, reasons))
-    if signals or startup:
-        if startup:
-            selected = best
-            reasons = ["resultado da primeira busca ao iniciar o monitor"]
-        else:
-            selected, reasons = min(signals, key=lambda pair: pair[0]["amount"])
-        shortlist = sorted(offers, key=lambda x: x["amount"])[:4]
-        lines = [f"• {x['origin']} → {cfg['destination']}: R$ {x['amount']:.2f} | {x['departure']} a {x['return']}" for x in shortlist]
-        heading = "🔎 Busca inicial de passagem" if startup else "✈️ Alerta de passagem"
-        telegram(cfg, heading + "\n"
-                 f"Melhor nova oferta: {selected['origin']} → {cfg['destination']} | ida {selected['departure']} e volta {selected['return']}\n"
-                 f"R$ {selected['amount']:.2f} | {selected['airline']}\n"
-                 f"Ida: {selected['outbound']} • Volta: {selected['inbound']}\n"
-                 f"Motivo: {', '.join(reasons)}\n\nMais baratas desta consulta:\n" + "\n".join(lines) +
-                 "\n\nConfira disponibilidade, bagagem e preço final no site antes de comprar.")
+    LOG.info("Menor preço agora: R$ %.2f (%s).", best["amount"], best["airline"])
+    lines = [f"✈️ R$ {best['amount']:.2f} | {best['airline']}"]
+    if previous_low is not None and best["amount"] < previous_low - 0.009:
+        lines.insert(0, "🔥 Menor valor")
+    telegram(cfg, "\n".join(lines))
 
 
 def run_once(cfg: dict[str, Any], startup: bool = False) -> None:
