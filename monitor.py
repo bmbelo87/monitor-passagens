@@ -91,10 +91,13 @@ def parse_offer(item: dict[str, Any], departure: date, return_date: date) -> dic
                               if (leg.get("departure_airport", {}).get("time", "")[:10] == return_date.isoformat())), len(flights) // 2 - 1)
     outbound = flights[:arrival_index + 1]
     inbound = flights[arrival_index + 1:]
-    if not outbound or not inbound:
+    # Round-trip results usually list only the outbound legs; price already covers both ways.
+    if not outbound:
         return None
 
     def leg_text(segments: list[dict[str, Any]]) -> str:
+        if not segments:
+            return ""
         first = segments[0]
         last = segments[-1]
         start = first.get("departure_airport", {}).get("time", "")
@@ -109,7 +112,7 @@ def parse_offer(item: dict[str, Any], departure: date, return_date: date) -> dic
         "origin": origin, "departure": departure.isoformat(), "return": return_date.isoformat(),
         "amount": float(item["price"]), "currency": "BRL", "airline": ", ".join(airlines) or "companhia não informada",
         "outbound": leg_text(outbound), "inbound": leg_text(inbound),
-        "stops_out": len(outbound)-1, "stops_in": len(inbound)-1,
+        "stops_out": len(outbound)-1, "stops_in": max(0, len(inbound)-1),
         "offer_id": str(item.get("departure_token", "")),
     }
 
