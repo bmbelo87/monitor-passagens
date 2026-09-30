@@ -143,7 +143,12 @@ def search(cfg: dict[str, Any], departure: date, return_date: date) -> list[dict
 def store_and_alert(cfg: dict[str, Any], offers: list[dict[str, Any]], startup: bool = False) -> None:
     if not offers:
         LOG.info("Nenhuma oferta recebida nesta rodada.")
-        telegram(cfg, "🔎 Nenhuma passagem encontrada nesta busca.")
+        with sqlite3.connect(DB_PATH) as db:
+            low = db.execute("SELECT amount, airline FROM fares ORDER BY amount LIMIT 1").fetchone()
+        if low:
+            telegram(cfg, f"🔎 Nenhuma oferta encontrada, valor mais baixo atualmente: R$ {low[0]:.2f} | {low[1]}")
+        else:
+            telegram(cfg, "🔎 Nenhuma oferta encontrada nesta busca.")
         return
     best = min(offers, key=lambda x: x["amount"])
     checked_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
