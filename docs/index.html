@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor de Passagens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f3f5fb; --bg2: #e8ecf8; --card: rgba(255,255,255,.78); --solid: #ffffff;
+    --text: #131726; --muted: #5d6680; --border: rgba(19,23,38,.08);
+    --brand: #ff5a36; --brand2: #ff9a3c; --sea: #0ea5b7; --sky: #4f6bff;
+    --good: #0f9d58; --bad: #e0434b; --grid: rgba(19,23,38,.07);
+    --shadow: 0 1px 2px rgba(19,23,38,.04), 0 12px 32px -12px rgba(19,23,38,.18);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0b0e17; --bg2: #121828; --card: rgba(23,29,46,.72); --solid: #171d2e;
+    --text: #eef1f8; --muted: #95a0bb; --border: rgba(255,255,255,.08);
+    --brand: #ff6b47; --brand2: #ffb15c; --sea: #2dd4bf; --sky: #7c8cff;
+    --good: #34d399; --bad: #fb7185; --grid: rgba(255,255,255,.07);
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -16px rgba(0,0,0,.7);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0b0e17; --bg2: #121828; --card: rgba(23,29,46,.72); --solid: #171d2e;
+      --text: #eef1f8; --muted: #95a0bb; --border: rgba(255,255,255,.08);
+      --brand: #ff6b47; --brand2: #ffb15c; --sea: #2dd4bf; --sky: #7c8cff;
+      --good: #34d399; --bad: #fb7185; --grid: rgba(255,255,255,.07);
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -16px rgba(0,0,0,.7);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); background: var(--bg);
+    font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background-image:
+      radial-gradient(900px 500px at 100% -10%, color-mix(in srgb, var(--brand2) 22%, transparent), transparent 60%),
+      radial-gradient(800px 500px at -10% 10%, color-mix(in srgb, var(--sea) 18%, transparent), transparent 60%),
+      linear-gradient(var(--bg), var(--bg2));
+    background-attachment: fixed;
+  }
+  main { max-width: 1120px; margin: 0 auto; padding: 20px 16px 56px; }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Barra superior */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .logo-mark { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff;
+               background: linear-gradient(135deg, var(--brand), var(--brand2)); box-shadow: 0 6px 16px -6px var(--brand); }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); }
+  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--good);
+                  box-shadow: 0 0 0 0 var(--good); animation: pulse 2s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 7px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .icon-btn { border: 1px solid var(--border); background: var(--card); color: var(--text); border-radius: 10px;
+              width: 38px; height: 38px; cursor: pointer; display: grid; place-items: center; backdrop-filter: blur(12px); font-size: 1rem; }
+  .icon-btn:hover { border-color: color-mix(in srgb, var(--brand) 40%, transparent); }
+
+  /* Cartões */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
+          backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); padding: 20px; min-width: 0; }
+  .card h2 { margin: 0 0 4px; font-size: 1rem; }
+  .card .hint { color: var(--muted); font-size: .82rem; margin: 0 0 16px; }
+  .reveal { opacity: 0; transform: translateY(14px); animation: in .7s cubic-bezier(.2,.7,.2,1) forwards; }
+  @keyframes in { to { opacity: 1; transform: none; } }
+
+  /* Destaque */
+  .hero { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .route { position: relative; overflow: hidden; padding: 24px; min-height: 280px;
+           background: linear-gradient(140deg, #0f2a4a 0%, #134e6f 45%, #0ea5b7 100%); color: #fff; border: 0; }
+  .route::after { content: ""; position: absolute; inset: auto -20% -60% -20%; height: 80%;
+                  background: radial-gradient(closest-side, rgba(255,190,110,.35), transparent); pointer-events: none; }
+  .route .eyebrow { font-size: .75rem; letter-spacing: .14em; text-transform: uppercase; opacity: .75; }
+  .cities { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; position: relative; z-index: 1; margin-top: 8px; }
+  .city .code { font-family: "Space Grotesk", sans-serif; font-size: clamp(2rem, 7vw, 3.4rem); font-weight: 700; line-height: 1; letter-spacing: -.02em; }
+  .city .name { opacity: .8; font-size: .9rem; }
+  .city.to { text-align: right; }
+  .arc { position: absolute; left: 0; right: 0; top: 78px; width: 100%; height: 130px; z-index: 0; }
+  .arc path.track { stroke: rgba(255,255,255,.35); stroke-dasharray: 2 8; stroke-linecap: round; }
+  .arc path.trail { stroke: url(#trail); stroke-width: 2.5; stroke-dasharray: 700; stroke-dashoffset: 700;
+                    animation: draw 2.4s .3s cubic-bezier(.45,0,.55,1) forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .trip { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 72px; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 99px; font-size: .82rem;
+          background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); }
+  .chip strong { font-weight: 600; }
+
+  .price { display: flex; flex-direction: column; justify-content: space-between; gap: 14px; position: relative; overflow: hidden; }
+  .price .label { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+  .price .value { font-family: "Space Grotesk", sans-serif; font-weight: 700; font-size: clamp(2.6rem, 8vw, 3.8rem); line-height: 1.05;
+                  letter-spacing: -.02em; background: linear-gradient(120deg, var(--brand), var(--brand2));
+                  -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .price .value small { font-size: .45em; margin-right: 4px; }
+  .delta { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; font-size: .8rem; font-weight: 600; }
+  .delta.down { color: var(--good); background: color-mix(in srgb, var(--good) 14%, transparent); }
+  .delta.up { color: var(--bad); background: color-mix(in srgb, var(--bad) 14%, transparent); }
+  .delta.flat { color: var(--muted); background: var(--grid); }
+  .airline { display: flex; align-items: center; gap: 10px; }
+  .avatar { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; color: #fff; font-size: .8rem; flex: none; }
+  .airline .sub { color: var(--muted); font-size: .82rem; }
+  .cta { display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: #fff; font-weight: 600;
+         padding: 12px 16px; border-radius: 12px; background: linear-gradient(120deg, var(--brand), var(--brand2));
+         box-shadow: 0 10px 24px -10px var(--brand); transition: transform .15s, box-shadow .15s; }
+  .cta:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px var(--brand); }
+  .record { position: absolute; top: 16px; right: 16px; font-size: .7rem; font-weight: 700; padding: 4px 10px; border-radius: 99px;
+            color: #fff; background: linear-gradient(120deg, #f43f5e, #f59e0b); animation: wiggle 2.5s ease-in-out infinite; }
+  @keyframes wiggle { 0%, 90%, 100% { transform: rotate(0); } 93% { transform: rotate(-4deg); } 96% { transform: rotate(4deg); } }
+
+  /* Números */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
+  .stat { padding: 16px 18px; }
+  .stat .k { color: var(--muted); font-size: .78rem; font-weight: 500; }
+  .stat .v { font-family: "Space Grotesk", sans-serif; font-size: 1.5rem; font-weight: 700; margin-top: 2px; letter-spacing: -.01em; }
+  .stat .s { color: var(--muted); font-size: .78rem; }
+
+  /* Gráfico */
+  .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .chart-wrap { position: relative; }
+  svg.chart { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+  svg.chart text { fill: var(--muted); font-size: 11px; font-family: Inter, sans-serif; }
+  .seg { display: inline-flex; background: var(--grid); border-radius: 10px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; color: var(--muted); padding: 5px 10px; border-radius: 8px; cursor: pointer; font: inherit; font-size: .8rem; }
+  .seg button.on { background: var(--solid); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .tip { position: absolute; pointer-events: none; background: var(--solid); border: 1px solid var(--border); border-radius: 12px;
+         padding: 8px 12px; font-size: .82rem; box-shadow: var(--shadow); white-space: nowrap; transform: translate(-50%, calc(-100% - 14px));
+         opacity: 0; transition: opacity .12s; z-index: 2; }
+  .tip strong { font-family: "Space Grotesk", sans-serif; font-size: 1.05rem; }
+
+  /* Companhias */
+  .bars { display: flex; flex-direction: column; gap: 14px; }
+  .bar-row .top-line { display: flex; justify-content: space-between; font-size: .88rem; margin-bottom: 6px; }
+  .bar-row .track { height: 8px; border-radius: 99px; background: var(--grid); overflow: hidden; }
+  .bar-row .fill { height: 100%; border-radius: 99px; width: 0; transition: width 1s cubic-bezier(.2,.7,.2,1); }
+
+  /* Tabela */
+  .table-wrap { overflow-x: auto; margin: 0 -4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: color-mix(in srgb, var(--brand) 6%, transparent); }
+  td .mini { display: inline-block; height: 6px; border-radius: 99px; vertical-align: middle; margin-left: 8px;
+             background: linear-gradient(90deg, var(--sea), var(--sky)); opacity: .7; }
+  .best { color: var(--good); font-weight: 600; font-size: .72rem; padding: 2px 8px; border-radius: 99px;
+          background: color-mix(in srgb, var(--good) 14%, transparent); margin-left: 6px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+
+  .empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+  .empty .plane { font-size: 2.4rem; display: inline-block; animation: float 3s ease-in-out infinite; }
+  @keyframes float { 50% { transform: translateY(-8px) rotate(-4deg); } }
+  footer { color: var(--muted); font-size: .78rem; text-align: center; margin-top: 28px; }
+
+  @media (max-width: 860px) {
+    .hero, .grid2 { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 420px) { .stats { gap: 10px; } .stat .v { font-size: 1.2rem; } .live { display: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+    .reveal { opacity: 1; transform: none; } .arc path.trail { stroke-dashoffset: 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="top">
+    <div class="logo"><span class="logo-mark">✈</span><span>Monitor de Passagens</span></div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span class="live" id="updated"></span>
+      <button class="icon-btn" id="theme" title="Alternar tema claro/escuro" aria-label="Alternar tema">◐</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="card route reveal">
+      <div class="eyebrow">Ida e volta · monitorando</div>
+      <svg class="arc" viewBox="0 0 600 130" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="trail" x1="0" x2="1">
+            <stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#ffd59a"/>
+          </linearGradient>
+        </defs>
+        <path class="track" d="M40 115 Q300 -35 560 115" fill="none" stroke-width="2"/>
+        <path class="trail" d="M40 115 Q300 -35 560 115" fill="none"/>
+        <g id="plane"><text font-size="22" fill="#fff" text-anchor="middle" dominant-baseline="central" transform="rotate(45)">✈</text></g>
+      </svg>
+      <div class="cities">
+        <div class="city"><div class="code" id="from-code"></div><div class="name" id="from-name"></div></div>
+        <div class="city to"><div class="code" id="to-code"></div><div class="name" id="to-name"></div></div>
+      </div>
+      <div class="trip" id="trip"></div>
+    </div>
+
+    <div class="card price reveal" style="animation-delay:.08s" id="price"></div>
+  </section>
+
+  <section class="stats" id="stats"></section>
+
+  <section class="grid2">
+    <div class="card reveal" style="animation-delay:.2s">
+      <div class="head">
+        <div><h2>Menor preço de cada dia</h2><p class="hint">Passe o mouse ou toque no gráfico; a faixa azul mostra a variação no dia</p></div>
+        <div class="seg" id="range">
+          <button data-n="7">7 dias</button><button data-n="30">30 dias</button><button data-n="0" class="on">Tudo</button>
+        </div>
+      </div>
+      <div class="chart-wrap" id="chart"></div>
+    </div>
+    <div class="card reveal" style="animation-delay:.26s">
+      <h2>Quem teve o menor preço</h2>
+      <p class="hint">Dias em que cada companhia foi a mais barata</p>
+      <div class="bars" id="airlines"></div>
+    </div>
+  </section>
+
+  <section class="card reveal" style="animation-delay:.32s">
+    <h2>Histórico diário</h2>
+    <p class="hint">O melhor preço encontrado em cada dia de monitoramento</p>
+    <div class="table-wrap" id="table"></div>
+  </section>
+
+  <footer id="footer"></footer>
+</main>
+
+<script>
+const DATA = {"generated_at": "2026-10-07T02:42:14+00:00", "origins": ["GRU", "CGH"], "destination": "NAT", "departure": "2027-04-21", "return": "2027-04-27", "interval": 360, "fares": [{"checked_at": "2026-10-07T02:42:13+00:00", "origin": "CGH", "destination": "NAT", "departure": "2027-04-21", "return_date": "2027-04-27", "amount": 927.0, "airline": "Gol", "outbound": "15:15–01:30 (2 escala(s))", "inbound": "", "stops_out": 2, "stops_in": 0}]};
+
+const CITIES = { GRU: "São Paulo", CGH: "São Paulo", VCP: "Campinas", NAT: "Natal", CNF: "Belo Horizonte",
+  GIG: "Rio de Janeiro", SDU: "Rio de Janeiro", BSB: "Brasília", SSA: "Salvador", REC: "Recife",
+  FOR: "Fortaleza", POA: "Porto Alegre", CWB: "Curitiba", FLN: "Florianópolis", MCZ: "Maceió", JPA: "João Pessoa" };
+const AIRLINE_COLORS = { LATAM: "#d21a52", GOL: "#ff7020", AZUL: "#1f5fd1" };
+
+const $ = id => document.getElementById(id);
+const brl = v => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+const dayLabel = s => new Date(s + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "");
+const weekday = s => new Date(s + "T12:00:00").toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const todayKey = () => new Date().toLocaleDateString("sv");
+function airlineColor(name) {
+  const up = String(name).toUpperCase();
+  for (const [k, c] of Object.entries(AIRLINE_COLORS)) if (up.includes(k)) return c;
+  let h = 0; for (const ch of up) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return `hsl(${h} 55% 48%)`;
+}
+const initials = name => String(name || "?").split(/[ ,]+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase();
+
+/* ---------- Tema ---------- */
+(function setupTheme() {
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("theme"); if (t) root.dataset.theme = t; } catch {}
+  $("theme").onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("theme", root.dataset.theme); } catch {}
+  };
+})();
+
+/* ---------- Dados ---------- */
+// Menor tarifa de cada dia (no fuso de quem abre a página), guardando também o maior valor visto no dia.
+function dailyLows(fares) {
+  const byDay = new Map();
+  for (const f of fares) {
+    const key = new Date(f.checked_at).toLocaleDateString("sv");
+    const cur = byDay.get(key);
+    const count = (cur?.count || 0) + 1, high = Math.max(cur?.high || 0, f.amount);
+    byDay.set(key, cur && cur.amount <= f.amount ? { ...cur, count, high } : { ...f, count, high });
+  }
+  return [...byDay.entries()].map(([day, f]) => ({ ...f, day }));
+}
+
+function flightsUrl(d) {
+  const q = `Flights from ${d.origins.join(",")} to ${d.destination} on ${d.departure} through ${d.return}`;
+  return "https://www.google.com/travel/flights?hl=pt-BR&curr=BRL&q=" + encodeURIComponent(q);
+}
+
+function countUp(el, to) {
+  const start = performance.now(), dur = 1100;
+  const step = now => {
+    const p = Math.min(1, (now - start) / dur), e = 1 - Math.pow(1 - p, 3);
+    el.innerHTML = `<small>R$</small>${Math.round(to * e).toLocaleString("pt-BR")}`;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) el.innerHTML = `<small>R$</small>${Math.round(to).toLocaleString("pt-BR")}`;
+  else requestAnimationFrame(step);
+}
+
+/* ---------- Página ---------- */
+function render(d) {
+  const daily = dailyLows(d.fares);
+  const today = daily.at(-1), yesterday = daily.at(-2);
+  const min = daily.length ? Math.min(...daily.map(f => f.amount)) : null;
+  const minFare = daily.find(f => f.amount === min);
+
+  // Rota
+  $("from-code").textContent = d.origins.join(" · ");
+  $("from-name").textContent = [...new Set(d.origins.map(c => CITIES[c] || c))].join(" / ");
+  $("to-code").textContent = d.destination;
+  $("to-name").textContent = CITIES[d.destination] || d.destination;
+  const dep = new Date(d.departure + "T12:00:00"), ret = new Date(d.return + "T12:00:00");
+  const nights = Math.round((ret - dep) / 864e5);
+  const daysLeft = Math.ceil((dep - new Date()) / 864e5);
+  $("trip").innerHTML = `
+    <span class="chip">🛫 <strong>${weekday(d.departure)}, ${dayLabel(d.departure)}</strong></span>
+    <span class="chip">🛬 <strong>${weekday(d.return)}, ${dayLabel(d.return)}</strong></span>
+    <span class="chip">🌙 ${nights} noites</span>
+    ${daysLeft > 0 ? `<span class="chip">⏳ faltam <strong>${daysLeft}</strong> dias</span>` : ""}`;
+  animatePlane();
+
+  // Menor valor do dia
+  if (today) {
+    const diff = yesterday ? today.amount - yesterday.amount : null;
+    const deltaHtml = diff == null ? `<span class="delta flat">primeiro dia monitorado</span>`
+      : Math.abs(diff) < 0.5 ? `<span class="delta flat">= igual ao dia anterior</span>`
+      : `<span class="delta ${diff < 0 ? "down" : "up"}">${diff < 0 ? "▼" : "▲"} ${brl(Math.abs(diff))} vs. dia anterior</span>`;
+    const isRecord = today.amount === min && daily.length > 1;
+    $("price").innerHTML = `
+      ${isRecord ? `<span class="record">🔥 MENOR JÁ VISTO</span>` : ""}
+      <div>
+        <div class="label">Menor valor ${today.day === todayKey() ? "de hoje" : "em " + dayLabel(today.day)}</div>
+        <div class="value num" id="big"></div>
+        <div style="margin-top:10px">${deltaHtml}</div>
+      </div>
+      <div class="airline">
+        <span class="avatar" style="background:${airlineColor(today.airline)}">${esc(initials(today.airline))}</span>
+        <div><div><strong>${esc(today.airline)}</strong> · saindo de ${esc(today.origin)}</div>
+          <div class="sub">${today.outbound ? "ida " + esc(today.outbound) + " · " : ""}ida e volta, por pessoa</div></div>
+      </div>
+      <a class="cta" href="${flightsUrl(d)}" target="_blank" rel="noopener">Ver voos e reservar ↗</a>`;
+    countUp($("big"), today.amount);
+  } else {
+    $("price").innerHTML = `<div class="empty"><span class="plane">✈️</span>
+      <p><strong>Aguardando a primeira busca</strong><br>O menor preço do dia aparece aqui assim que o monitor rodar.</p></div>
+      <a class="cta" href="${flightsUrl(d)}" target="_blank" rel="noopener">Ver voos agora ↗</a>`;
+  }
+
+  // Números
+  const last7 = daily.slice(-7).map(f => f.amount);
+  const avg7 = last7.length ? last7.reduce((a, b) => a + b, 0) / last7.length : null;
+  const first = daily[0];
+  const change = first && today && daily.length > 1 ? (today.amount - first.amount) / first.amount * 100 : null;
+  const stats = [
+    ["Menor já registrado", min != null ? brl(min) : "—", minFare ? `${dayLabel(minFare.day)} · ${esc(minFare.airline)}` : "aguardando dados"],
+    ["Média dos últimos 7 dias", avg7 != null ? brl(avg7) : "—", last7.length ? `${last7.length} dia(s) considerados` : "aguardando dados"],
+    ["Desde o início", change != null ? `<span style="color:var(--${change <= 0 ? "good" : "bad"})">${change > 0 ? "+" : ""}${change.toFixed(1).replace(".", ",")}%</span>` : "—",
+      first ? `começou em ${brl(first.amount)}` : "aguardando dados"],
+    ["Consultas feitas", String(d.fares.length), `${daily.length} dia(s) · a cada ${Math.round(d.interval / 60)} h`],
+  ];
+  $("stats").innerHTML = stats.map(([k, v, s], i) =>
+    `<div class="card stat reveal" style="animation-delay:${.12 + i * .04}s"><div class="k">${k}</div><div class="v num">${v}</div><div class="s">${s}</div></div>`).join("");
+
+  // Gráfico
+  const current = () => +$("range").querySelector(".on").dataset.n;
+  const draw = () => { const n = current(); renderChart(n ? daily.slice(-n) : daily, min); };
+  $("range").querySelectorAll("button").forEach(b => b.onclick = () => {
+    $("range").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+    draw();
+  });
+  draw();
+  let t; window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 120); });
+
+  // Companhias
+  const wins = {};
+  daily.forEach(f => wins[f.airline] = (wins[f.airline] || 0) + 1);
+  const ranked = Object.entries(wins).sort((a, b) => b[1] - a[1]);
+  $("airlines").innerHTML = ranked.length ? ranked.map(([name, n]) => `
+    <div class="bar-row"><div class="top-line"><span>${esc(name)}</span>
+      <span class="num" style="color:var(--muted)">${n} dia(s) · ${Math.round(n / daily.length * 100)}%</span></div>
+      <div class="track"><div class="fill" data-w="${n / daily.length * 100}" style="background:${airlineColor(name)}"></div></div></div>`).join("")
+    : `<div class="empty" style="padding:24px 0">Sem dados ainda.</div>`;
+  setTimeout(() => document.querySelectorAll(".fill").forEach(el => el.style.width = el.dataset.w + "%"), 400);
+
+  // Tabela
+  const maxAmt = Math.max(...daily.map(f => f.amount), 1);
+  $("table").innerHTML = daily.length ? `
+    <table><thead><tr><th>Dia</th><th>Menor preço</th><th>Companhia</th><th>Origem</th><th>Voo de ida</th><th>Consultas</th></tr></thead>
+    <tbody>${[...daily].reverse().map(f => `<tr>
+      <td>${weekday(f.day)}, ${dayLabel(f.day)}</td>
+      <td class="num"><strong>${brl(f.amount)}</strong><span class="mini" style="width:${Math.max(6, f.amount / maxAmt * 70)}px"></span>${f.amount === min ? '<span class="best">menor</span>' : ""}</td>
+      <td><span class="dot" style="background:${airlineColor(f.airline)}"></span>${esc(f.airline)}</td>
+      <td>${esc(f.origin)}</td>
+      <td style="color:var(--muted)">${esc(f.outbound) || "—"}</td>
+      <td class="num" style="color:var(--muted)">${f.count}</td>
+    </tr>`).join("")}</tbody></table>`
+    : `<div class="empty"><span class="plane">🗓️</span><p>O histórico começa depois da primeira busca.</p></div>`;
+
+  // Rodapé
+  $("updated").textContent = "atualizado " + new Date(d.generated_at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  $("footer").textContent = "Preços do Google Flights no momento de cada busca, ida e volta para 1 adulto. Bagagem e regras tarifárias podem variar; confirme o valor no site antes de comprar.";
+}
+
+function animatePlane() {
+  const plane = $("plane"), path = document.querySelector(".arc path.track");
+  const len = path.getTotalLength(), start = performance.now(), dur = 2400, delay = 300;
+  const place = p => {
+    const at = Math.min(len - 1, p * len), pt = path.getPointAtLength(at), nx = path.getPointAtLength(at + 1);
+    const ang = Math.atan2(nx.y - pt.y, nx.x - pt.x) * 180 / Math.PI;
+    plane.setAttribute("transform", `translate(${pt.x},${pt.y}) rotate(${ang})`);
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return place(1);
+  const step = now => {
+    const t = Math.max(0, Math.min(1, (now - start - delay) / dur));
+    place(t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function renderChart(days, min) {
+  const el = $("chart");
+  if (days.length < 2) {
+    el.innerHTML = `<div class="empty"><span class="plane">📈</span><p>O gráfico aparece a partir do segundo dia de consultas.</p></div>`;
+    return;
+  }
+  const W = Math.max(300, el.clientWidth || 700), H = W < 500 ? 230 : 290;
+  const L = 48, R = 12, T = 28, B = 28;
+  const xs = i => L + i / (days.length - 1) * (W - L - R);
+  let lo = Math.min(...days.map(f => f.amount)), hi = Math.max(...days.map(f => f.high));
+  const pad = (hi - lo) * .15 || 50; lo = Math.max(0, lo - pad); hi += pad;
+  const y = v => T + (1 - (v - lo) / (hi - lo)) * (H - T - B);
+
+  const grid = [];
+  for (let i = 0; i <= 4; i++) {
+    const v = lo + (hi - lo) * i / 4;
+    grid.push(`<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)"/>
+      <text x="${L - 8}" y="${y(v) + 4}" text-anchor="end">${Math.round(v).toLocaleString("pt-BR")}</text>`);
+  }
+  const every = Math.max(1, Math.ceil(days.length / Math.max(2, Math.floor((W - L) / 70))));
+  const xl = days.map((f, i) => (i % every === 0 || i === days.length - 1)
+    ? `<text x="${xs(i)}" y="${H - 6}" text-anchor="middle">${dayLabel(f.day)}</text>` : "").join("");
+
+  // Curva suave (Catmull-Rom convertida em Bézier)
+  const pts = days.map((f, i) => [xs(i), y(f.amount)]);
+  let line = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+    line += ` C${p1[0] + (p2[0] - p0[0]) / 6},${p1[1] + (p2[1] - p0[1]) / 6} ${p2[0] - (p3[0] - p1[0]) / 6},${p2[1] - (p3[1] - p1[1]) / 6} ${p2[0]},${p2[1]}`;
+  }
+  const area = `${line} L${pts.at(-1)[0]},${H - B} L${pts[0][0]},${H - B} Z`;
+  const ranges = days.map((f, i) => f.high > f.amount
+    ? `<line x1="${xs(i)}" x2="${xs(i)}" y1="${y(f.high)}" y2="${y(f.amount)}" stroke="var(--sky)" stroke-opacity=".22" stroke-width="7" stroke-linecap="round"/>` : "").join("");
+  const minI = days.findIndex(f => f.amount === min);
+
+  el.innerHTML = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Menor preço de cada dia">
+    <defs>
+      <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="var(--brand)" stop-opacity=".28"/><stop offset="1" stop-color="var(--brand)" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="stroke" x1="0" x2="1"><stop offset="0" stop-color="var(--brand2)"/><stop offset="1" stop-color="var(--brand)"/></linearGradient>
+    </defs>
+    ${grid.join("")}${xl}${ranges}
+    <path d="${area}" fill="url(#area)"/>
+    <path d="${line}" fill="none" stroke="url(#stroke)" stroke-width="3" stroke-linecap="round"/>
+    ${minI >= 0 ? `<circle cx="${pts[minI][0]}" cy="${pts[minI][1]}" r="12" fill="var(--good)" opacity=".18"/>
+      <text x="${pts[minI][0]}" y="${pts[minI][1] - 16}" text-anchor="middle" style="fill:var(--good);font-weight:600">menor</text>` : ""}
+    ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="${i === minI ? 5 : 3.5}" fill="${i === minI ? "var(--good)" : "var(--solid)"}" stroke="${i === minI ? "var(--solid)" : "var(--brand)"}" stroke-width="2"/>`).join("")}
+    <line id="cross" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 4" opacity="0"/>
+    <circle id="focus" r="6" fill="var(--brand)" stroke="var(--solid)" stroke-width="2" opacity="0"/>
+    <rect id="hit" x="${L - 10}" y="0" width="${W - L - R + 20}" height="${H}" fill="transparent"/>
+  </svg><div class="tip" id="tip"></div>`;
+
+  const svg = el.querySelector("svg"), tip = $("tip"), cross = $("cross"), focus = $("focus");
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), cx = ((ev.touches?.[0] || ev).clientX - r.left) * W / r.width;
+    const i = Math.max(0, Math.min(days.length - 1, Math.round((cx - L) / (W - L - R) * (days.length - 1))));
+    const f = days[i];
+    cross.setAttribute("x1", xs(i)); cross.setAttribute("x2", xs(i)); cross.setAttribute("opacity", ".5");
+    focus.setAttribute("cx", pts[i][0]); focus.setAttribute("cy", pts[i][1]); focus.setAttribute("opacity", "1");
+    tip.innerHTML = `<strong>${brl(f.amount)}</strong> · ${esc(f.airline)}<br><span style="color:var(--muted)">${weekday(f.day)}, ${dayLabel(f.day)} · ${f.count} consulta(s)${f.high > f.amount ? ` · até ${brl(f.high)}` : ""}</span>`;
+    tip.style.left = Math.min(r.width - 100, Math.max(100, xs(i) * r.width / W)) + "px";
+    tip.style.top = pts[i][1] * r.height / H + "px";
+    tip.style.opacity = 1;
+  };
+  const hide = () => { tip.style.opacity = 0; cross.setAttribute("opacity", "0"); focus.setAttribute("opacity", "0"); };
+  const hit = $("hit");
+  hit.addEventListener("mousemove", move); hit.addEventListener("mouseleave", hide);
+  hit.addEventListener("touchstart", move, { passive: true }); hit.addEventListener("touchmove", move, { passive: true });
+}
+
+render(DATA);
+</script>
+</body>
+</html>

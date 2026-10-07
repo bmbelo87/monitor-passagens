@@ -1,8 +1,8 @@
-# Monitor de passagens: São Paulo ↔ Belo Horizonte
+# Monitor de passagens: São Paulo ↔ Natal
 
-Consulta o Google Flights pela SerpApi, salva no SQLite a menor tarifa encontrada para cada combinação de datas e manda alertas ao Telegram quando identifica queda, novo menor preço registrado ou valor abaixo do limite.
+Consulta o Google Flights pela SerpApi, salva no SQLite a menor tarifa encontrada para cada combinação de datas e manda ao Telegram o preço encontrado e o menor valor do dia, destacando quando aparece o menor preço já registrado. Não há valor mínimo nem limite: o monitor sempre mostra o menor preço disponível.
 
-Padrão: GRU ou CGH → CNF, ida em 17/12/2026 e volta em 20/12/2026, sem datas alternativas. O SerpApi aceita GRU e CGH juntos numa busca, então cada rodada faz uma única consulta. O intervalo está configurado em 6 horas, estimando cerca de 120 buscas em um ciclo de 30 dias.
+Padrão: GRU ou CGH → NAT, ida em 21/04/2027 e volta em 27/04/2027, sem datas alternativas. O SerpApi aceita GRU e CGH juntos numa busca, então cada rodada faz uma única consulta. O intervalo está configurado em 6 horas, estimando cerca de 120 buscas em um ciclo de 30 dias.
 
 ## Custo e cota
 
@@ -52,11 +52,21 @@ O horário do agendamento pode atrasar alguns minutos. Cada execução agendada 
 | Variável | Padrão | Uso |
 |---|---:|---|
 | `ORIGIN_AIRPORTS` | `GRU,CGH` | Aeroportos de origem considerados |
-| `DESTINATION_AIRPORT` | `CNF` | Aeroporto de Belo Horizonte |
-| `DEPARTURE_DATE` / `RETURN_DATE` | `2026-12-17` / `2026-12-20` | Ida e volta |
+| `DESTINATION_AIRPORT` | `NAT` | Aeroporto de Natal (São Gonçalo do Amarante) |
+| `DEPARTURE_DATE` / `RETURN_DATE` | `2027-04-21` / `2027-04-27` | Ida e volta |
 | `DATE_WINDOW_DAYS` | `0` | `0` busca só as datas definidas |
-| `MAX_PRICE_BRL` | `500` | Limite que dispara alerta |
 | `ADULTS` | `1` | Número de adultos |
 | `POLL_INTERVAL_MINUTES` | `360` | Intervalo entre consultas (6 horas) |
 
 O preço e as condições são os exibidos no resultado no momento da busca; bagagem, assentos e regras tarifárias podem variar. Confirme a tarifa final no site de venda antes de comprar. O monitor guarda o menor valor que ele próprio observou no histórico; isso não garante que seja o menor preço de todo o mercado.
+
+## Painel web
+
+`dashboard.py` lê o histórico e gera `docs/index.html`, uma página única (sem servidor) com o menor valor de hoje, o menor já registrado, um gráfico com o menor preço de cada dia e uma tabela com o melhor preço de cada dia.
+
+```powershell
+.\.venv\Scripts\python.exe dashboard.py
+start docs\index.html
+```
+
+No GitHub Actions o painel é regenerado e salvo a cada rodada. Para vê-lo online, ative **Settings → Pages → Deploy from a branch → `main` / `/docs`**. Atenção: em conta gratuita o GitHub Pages só funciona em repositório público, e a página fica visível para qualquer pessoa com o link (ela não contém chaves, só os preços). Com o repositório privado, basta baixar `docs/index.html` e abrir no navegador.

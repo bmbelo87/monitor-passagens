@@ -20,6 +20,8 @@ DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "fares.sqlite3"
 LOG = logging.getLogger("fare-monitor")
 SERPAPI_URL = "https://serpapi.com/search.json"
+# Horário de Brasília (sem horário de verão desde 2019), usado para definir "o dia".
+BRT = timezone(timedelta(hours=-3))
 
 
 def settings() -> dict[str, Any]:
@@ -32,14 +34,24 @@ def settings() -> dict[str, Any]:
         "telegram_token": os.getenv("TELEGRAM_BOT_TOKEN", "").strip(),
         "telegram_chat_id": os.getenv("TELEGRAM_CHAT_ID", "").strip(),
         "origins": origins,
-        "destination": os.getenv("DESTINATION_AIRPORT", "CNF").strip().upper(),
-        "departure": date.fromisoformat(os.getenv("DEPARTURE_DATE", "2026-12-16")),
-        "return": date.fromisoformat(os.getenv("RETURN_DATE", "2026-12-20")),
+        "destination": os.getenv("DESTINATION_AIRPORT", "NAT").strip().upper(),
+        "departure": date.fromisoformat(os.getenv("DEPARTURE_DATE", "2027-04-21")),
+        "return": date.fromisoformat(os.getenv("RETURN_DATE", "2027-04-27")),
         "window": max(0, int(os.getenv("DATE_WINDOW_DAYS", "1"))),
         "interval": max(1, int(os.getenv("POLL_INTERVAL_MINUTES", "60"))),
-        "max_price": float(os.getenv("MAX_PRICE_BRL", "500")),
         "adults": max(1, int(os.getenv("ADULTS", "1"))),
     }
+
+
+# Keeps history from earlier trips out of comparisons and the dashboard.
+ROUTE_FILTER = "destination = ? AND departure BETWEEN ? AND ? AND return_date BETWEEN ? AND ?"
+
+
+def route_params(cfg: dict[str, Any]) -> tuple[str, ...]:
+    window = timedelta(days=cfg["window"])
+    return (cfg["destination"],
+            (cfg["departure"] - window).isoformat(), (cfg["departure"] + window).isoformat(),
+            (cfg["return"] - window).isoformat(), (cfg["return"] + window).isoformat())
 
 
 def init_db() -> None:
@@ -78,13 +90,13 @@ def dates_to_check(cfg: dict[str, Any]) -> list[tuple[date, date]]:
     return [(out, back) for out, back in itertools.product(departures, returns) if back > out]
 
 
-def parse_offer(item: dict[str, Any], departure: date, return_date: date) -> dict[str, Any] | None:
+def parse_offer(item: dict[str, Any], departure: date, return_date: date, destination: str) -> dict[str, Any] | None:
     flights = item.get("flights", [])
     if not flights or not isinstance(item.get("price"), (int, float)):
         return None
     # Google Flights lists both directions in a single round-trip result.
     arrival_index = next((i for i, leg in enumerate(flights)
-                          if leg.get("arrival_airport", {}).get("id") == "CNF"), None)
+                          if leg.get("arrival_airport", {}).get("id") == destination), None)
     if arrival_index is None:
         # Fall back to splitting the returned itinerary by travel date.
         arrival_index = next((i for i, leg in enumerate(flights)
@@ -137,7 +149,7 @@ def search(cfg: dict[str, Any], departure: date, return_date: date) -> list[dict
         raise RuntimeError("SerpApi não concluiu a busca; confira chave e cota no painel.")
     results = []
     for item in payload.get("best_flights", []) + payload.get("other_flights", []):
-        parsed = parse_offer(item, departure, return_date)
+        parsed = parse_offer(item, departure, return_date, cfg["destination"])
         if parsed:
             results.append(parsed)
     return results
@@ -147,7 +159,8 @@ def store_and_alert(cfg: dict[str, Any], offers: list[dict[str, Any]], startup: 
     if not offers:
         LOG.info("Nenhuma oferta recebida nesta rodada.")
         with sqlite3.connect(DB_PATH) as db:
-            low = db.execute("SELECT amount, airline FROM fares ORDER BY amount LIMIT 1").fetchone()
+            low = db.execute("SELECT amount, airline FROM fares WHERE " + ROUTE_FILTER + " ORDER BY amount LIMIT 1",
+                             route_params(cfg)).fetchone()
         if low:
             telegram(cfg, f"🔎 Nenhuma oferta encontrada, valor mais baixo atualmente: R$ {low[0]:.2f} | {low[1]}")
         else:
@@ -156,16 +169,24 @@ def store_and_alert(cfg: dict[str, Any], offers: list[dict[str, Any]], startup: 
     best = min(offers, key=lambda x: x["amount"])
     checked_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
     with sqlite3.connect(DB_PATH) as db:
-        (previous_low,) = db.execute("SELECT MIN(amount) FROM fares").fetchone()
+        (previous_low,) = db.execute("SELECT MIN(amount) FROM fares WHERE " + ROUTE_FILTER, route_params(cfg)).fetchone()
         db.execute(
             "INSERT INTO fares (checked_at,origin,destination,departure,return_date,amount,currency,airline,outbound,inbound,stops_out,stops_in,offer_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (checked_at, best["origin"], cfg["destination"], best["departure"], best["return"], best["amount"], best["currency"], best["airline"], best["outbound"], best["inbound"], best["stops_out"], best["stops_in"], best["offer_id"]),
         )
         db.commit()
     LOG.info("Menor preço agora: R$ %.2f (%s).", best["amount"], best["airline"])
-    lines = [f"✈️ R$ {best['amount']:.2f} | {best['airline']}"]
+    today_low = best
+    with sqlite3.connect(DB_PATH) as db:
+        db.row_factory = sqlite3.Row
+        for row in db.execute("SELECT checked_at, amount, airline FROM fares WHERE " + ROUTE_FILTER, route_params(cfg)):
+            same_day = datetime.fromisoformat(row["checked_at"]).astimezone(BRT).date() == datetime.now(BRT).date()
+            if same_day and row["amount"] < today_low["amount"]:
+                today_low = dict(row)
+    lines = [f"✈️ Agora: R$ {best['amount']:.2f} | {best['airline']}",
+             f"📅 Menor de hoje: R$ {today_low['amount']:.2f} | {today_low['airline']}"]
     if previous_low is not None and best["amount"] < previous_low - 0.009:
-        lines.insert(0, "🔥 Menor valor")
+        lines.insert(0, "🔥 Menor valor já registrado")
     telegram(cfg, "\n".join(lines))
 
 
