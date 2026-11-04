@@ -2,7 +2,7 @@
 
 Consulta o Google Flights pela SerpApi, salva no SQLite a menor tarifa encontrada para cada combinação de datas e manda ao Telegram o preço encontrado e o menor valor do dia, destacando quando aparece o menor preço já registrado. Não há valor mínimo nem limite: o monitor sempre mostra o menor preço disponível.
 
-Padrão: GRU ou CGH → NAT, ida em 21/04/2027 e volta em 27/04/2027, sem datas alternativas. O SerpApi aceita GRU e CGH juntos numa busca, então cada rodada faz uma única consulta. O intervalo está configurado em 6 horas, estimando cerca de 120 buscas em um ciclo de 30 dias.
+Padrão: GRU ou CGH → NAT, ida em 22/04/2027 e volta em 27/04/2027, sem datas alternativas. O SerpApi aceita GRU e CGH juntos numa busca, então cada rodada faz uma única consulta. O intervalo está configurado em 6 horas, estimando cerca de 120 buscas em um ciclo de 30 dias.
 
 ## Custo e cota
 
@@ -53,7 +53,7 @@ O horário do agendamento pode atrasar alguns minutos. Cada execução agendada 
 |---|---:|---|
 | `ORIGIN_AIRPORTS` | `GRU,CGH` | Aeroportos de origem considerados |
 | `DESTINATION_AIRPORT` | `NAT` | Aeroporto de Natal (São Gonçalo do Amarante) |
-| `DEPARTURE_DATE` / `RETURN_DATE` | `2027-04-21` / `2027-04-27` | Ida e volta |
+| `DEPARTURE_DATE` / `RETURN_DATE` | `2027-04-22` / `2027-04-27` | Ida e volta |
 | `DATE_WINDOW_DAYS` | `0` | `0` busca só as datas definidas |
 | `ADULTS` | `1` | Número de adultos |
 | `POLL_INTERVAL_MINUTES` | `360` | Intervalo entre consultas (6 horas) |

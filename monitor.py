@@ -35,7 +35,7 @@ def settings() -> dict[str, Any]:
         "telegram_chat_id": os.getenv("TELEGRAM_CHAT_ID", "").strip(),
         "origins": origins,
         "destination": os.getenv("DESTINATION_AIRPORT", "NAT").strip().upper(),
-        "departure": date.fromisoformat(os.getenv("DEPARTURE_DATE", "2027-04-21")),
+        "departure": date.fromisoformat(os.getenv("DEPARTURE_DATE", "2027-04-22")),
         "return": date.fromisoformat(os.getenv("RETURN_DATE", "2027-04-27")),
         "window": max(0, int(os.getenv("DATE_WINDOW_DAYS", "1"))),
         "interval": max(1, int(os.getenv("POLL_INTERVAL_MINUTES", "60"))),
